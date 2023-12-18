@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(sound_service, LOG_LEVEL_INF);
 #define ESB_BLOCK_SIZE            (CONFIG_ESB_MAX_PAYLOAD_LENGTH - CONFIG_ESB_MAX_PAYLOAD_LENGTH % (MAX_BLOCK_SIZE/4 + 3))
 
 /* Milliseconds to wait for a block to be read. */
-#define READ_TIMEOUT            1000
+#define READ_TIMEOUT            SYS_FOREVER_MS
 
 
 static dvi_adpcm_state_t    m_adpcm_state;
@@ -49,9 +49,6 @@ static void mic_data_handle(void *, void *, void *)
 
     LOG_INF("Sound service start, wait for PCM data......");
 
-	/** suspend the thread until we received a start event*/
-	k_thread_suspend(k_current_get());
-
     while(1)
     {
 	#if 1
@@ -59,6 +56,7 @@ static void mic_data_handle(void *, void *, void *)
 	    char frame_buf[MAX_BLOCK_SIZE/4 + 3] = {0};
 
         size = read_audio_data(&buffer, READ_TIMEOUT);
+
         if(size)
         {
 			dvi_adpcm_encode(buffer, size, frame_buf, &frame_size,&m_adpcm_state, true);
@@ -112,16 +110,12 @@ static bool mic_work_event_handler(const struct app_event_header *aeh)
             LOG_INF("Micphone start to work!");
 			drv_mic_start();
 
-			k_thread_resume(sound_service);
-			
 			// turn_on_off_led(true);
 		}
 		else if(event->type == MIC_STATUS_STOP)
 		{
             LOG_INF("Micphone stop to work!");
 			drv_mic_stop();
-
-			k_thread_suspend(sound_service);
 
             // turn_on_off_led(false);
 		}
@@ -174,8 +168,6 @@ static bool handle_click_event(const struct click_event *event)
 			// APP_EVENT_SUBMIT(mic_event);
 			LOG_INF("Micphone start to work!");
 			drv_mic_start();
-
-			k_thread_resume(sound_service);
 		}
 		else
 		{
@@ -184,8 +176,6 @@ static bool handle_click_event(const struct click_event *event)
 			// APP_EVENT_SUBMIT(mic_event);
 			LOG_INF("Micphone stop to work!");
 			drv_mic_stop();
-
-			k_thread_suspend(sound_service);
 		}
 	#endif
 	}
